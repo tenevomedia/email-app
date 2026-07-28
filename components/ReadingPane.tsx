@@ -28,6 +28,10 @@ interface ReadingPaneProps {
   onOpenComposeWithReply?: (type: 'reply' | 'replyAll' | 'forward', email: EmailMessage) => void;
 }
 
+function createIsolatedEmailDocument(bodyHtml: string) {
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:"><style>html,body{margin:0;background:transparent;color:#17181c;font:14px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%;height:auto}a{color:#0067b9}</style></head><body>${bodyHtml}</body></html>`;
+}
+
 export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWithReply }) => {
   const { 
     archiveEmail, 
@@ -335,9 +339,11 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
             )}
           </div>
 
-          <div 
-            style={{ padding: "24px", color: "var(--text-main)", fontSize: "14px", lineHeight: "1.6" }}
-            dangerouslySetInnerHTML={{ __html: email.bodyHtml }}
+          <iframe
+            title={`Inhalt der E-Mail: ${email.subject}`}
+            sandbox=""
+            srcDoc={createIsolatedEmailDocument(email.bodyHtml)}
+            style={{ width: "100%", minHeight: "420px", border: "none", display: "block", background: "var(--bg-card)" }}
           />
 
           <div 

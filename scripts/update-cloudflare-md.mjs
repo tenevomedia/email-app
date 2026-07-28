@@ -9,7 +9,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { join } from "node:path";
 
 const ROOT = process.cwd();
 const WRITE = process.argv.includes("--write");

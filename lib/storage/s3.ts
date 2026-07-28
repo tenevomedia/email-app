@@ -27,6 +27,10 @@ export interface UploadResult {
   mimeType: string;
 }
 
+export function isAttachmentStorageConfigured() {
+  return Boolean(s3Endpoint && bucketName && s3AccessKeyId && s3SecretAccessKey);
+}
+
 /**
  * Uploads a file buffer to S3 / Cloudflare R2
  */
@@ -35,7 +39,7 @@ export async function uploadAttachmentToS3(
   filename: string,
   mimeType: string
 ): Promise<UploadResult> {
-  const fileKey = `attachments/${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+  const fileKey = `attachments/${crypto.randomUUID()}-${filename.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
 
   const command = new PutObjectCommand({
     Bucket: bucketName,

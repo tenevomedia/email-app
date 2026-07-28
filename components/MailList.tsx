@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { EmailMessage } from "@/lib/mockData";
 import { useEmail } from "@/lib/emailContext";
 import { 
@@ -36,12 +36,24 @@ export const MailList: React.FC<MailListProps> = ({
   const [checkedIds, setCheckedIds] = useState<Record<string, boolean>>({});
   const [allChecked, setAllChecked] = useState(false);
 
+  const selectedIds = useMemo(() => Object.keys(checkedIds).filter((id) => checkedIds[id]), [checkedIds]);
+
   const toggleCheckAll = () => {
     const next = !allChecked;
     setAllChecked(next);
     const newChecked: Record<string, boolean> = {};
     emails.forEach(e => { newChecked[e.id] = next; });
     setCheckedIds(newChecked);
+  };
+
+  const toggleChecked = (id: string) => {
+    setCheckedIds((previous) => ({ ...previous, [id]: !previous[id] }));
+  };
+
+  const applyToSelection = (action: (id: string) => void) => {
+    selectedIds.forEach(action);
+    setCheckedIds({});
+    setAllChecked(false);
   };
 
   // Sort: Pinned emails stay at the top!
@@ -83,8 +95,14 @@ export const MailList: React.FC<MailListProps> = ({
         </button>
 
         <div style={{ flex: 1, fontWeight: 600, fontSize: "12px", color: "var(--text-subtle)" }}>
-          {folderName}
+          {selectedIds.length ? `${selectedIds.length} ausgewählt` : folderName}
         </div>
+
+        {selectedIds.length > 0 && <>
+          <button className="v-Button v-Button--subtle v-Button--iconOnly" title="Ausgewählte archivieren" onClick={() => applyToSelection(archiveEmail)}><Archive size={15} /></button>
+          <button className="v-Button v-Button--subtle v-Button--iconOnly" title="Ausgewählte löschen" onClick={() => applyToSelection(deleteEmail)}><Trash2 size={15} /></button>
+          <button className="v-Button v-Button--subtle v-Button--iconOnly" title="Lesestatus umschalten" onClick={() => applyToSelection(toggleReadState)}><Mail size={15} /></button>
+        </>}
 
         <button className="v-Button v-Button--subtle v-Button--iconOnly" title="Filter">
           <Filter size={15} />
@@ -116,6 +134,15 @@ export const MailList: React.FC<MailListProps> = ({
               >
                 {/* Header row: Sender + Pin Indicator + Thread count + Date */}
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                  <button
+                    className="v-Button v-Button--subtle v-Button--iconOnly"
+                    style={{ padding: "2px" }}
+                    title={checkedIds[email.id] ? "Auswahl aufheben" : "E-Mail auswählen"}
+                    aria-label={checkedIds[email.id] ? "Auswahl aufheben" : "E-Mail auswählen"}
+                    onClick={(event) => { event.stopPropagation(); toggleChecked(email.id); }}
+                  >
+                    {checkedIds[email.id] ? <CheckSquare size={14} style={{ color: "var(--accent-primary)" }} /> : <Square size={14} />}
+                  </button>
                   {/* Avatar */}
                   <div 
                     className="v-Avatar" 

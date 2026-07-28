@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect -- Form state is intentionally reset when a compose session opens. */
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { 
   X, 
   Send, 
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { EmailMessage } from "@/lib/mockData";
 import { useEmail } from "@/lib/emailContext";
+import { escapeHtml } from "@/lib/mailValidation";
 
 interface ComposeModalProps {
   isOpen: boolean;
@@ -39,6 +41,8 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
   const [showCc, setShowCc] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const toInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (draftToEdit) {
@@ -63,7 +67,20 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
       setSubject("");
       setBody(settings.defaultSignature ? `\n\n${settings.defaultSignature}` : "");
     }
-  }, [replyToMessage, draftToEdit, settings.defaultSignature, isOpen]);
+  }, [replyToMessage, draftToEdit, settings.defaultSignature, isOpen, defaultId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const timeout = window.setTimeout(() => toInputRef.current?.focus(), 0);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(timeout);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -74,14 +91,19 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
       return;
     }
 
-    await sendEmail({
-      fromEmail: fromAddress,
-      toEmail: toInput,
-      cc: ccInput || undefined,
-      subject,
-      bodyText: body
-    });
-    onClose();
+    setIsSending(true);
+    try {
+      await sendEmail({
+        fromEmail: fromAddress,
+        toEmail: toInput,
+        cc: ccInput || undefined,
+        subject,
+        bodyText: body
+      });
+      onClose();
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleSaveDraftClick = () => {
@@ -90,14 +112,18 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
       fromEmail: fromAddress,
       toEmail: toInput,
       subject,
-      bodyHtml: `<p style="font-family: sans-serif; line-height: 1.6;">${body.replace(/\n/g, '<br/>')}</p>`,
+      bodyHtml: `<p style="font-family: sans-serif; line-height: 1.6;">${escapeHtml(body).replace(/\n/g, '<br/>')}</p>`,
       snippet: body
     });
     onClose();
   };
 
   return (
-    <div 
+    <div
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
       style={{
         position: "fixed",
         inset: 0,
@@ -109,7 +135,10 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
         padding: "20px"
       }}
     >
-      <div 
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="compose-title"
         style={{
           width: "100%",
           maxWidth: "760px",
@@ -135,7 +164,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
             padding: "0 16px"
           }}
         >
-          <span style={{ fontWeight: 700, fontSize: "14px", color: "var(--text-main)" }}>
+          <span id="compose-title" style={{ fontWeight: 700, fontSize: "14px", color: "var(--text-main)" }}>
             {draftToEdit ? "Entwurf bearbeiten" : replyToMessage ? "Antworten / Weiterleiten" : "Neue Nachricht verfassen"}
           </span>
 
@@ -202,11 +231,12 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
             <div style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "8px" }}>
               <span style={{ width: "60px", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)" }}>An (To):</span>
               <input
-                type="email"
+                ref={toInputRef}
+                type="text"
                 required
                 className="v-TextInput-input"
                 style={{ flex: 1, border: "none", background: "transparent" }}
-                placeholder="empfaenger@beispiel.de"
+                placeholder="empfaenger@beispiel.de, zweiter@beispiel.de"
                 value={toInput}
                 onChange={(e) => setToInput(e.target.value)}
               />
@@ -285,9 +315,9 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <button type="submit" className="v-Button v-Button--cta" style={{ height: "34px", padding: "0 16px" }}>
+              <button type="submit" disabled={isSending} className="v-Button v-Button--cta" style={{ height: "34px", padding: "0 16px" }}>
                 <Send size={15} />
-                <span>Senden</span>
+                <span>{isSending ? "Wird gesendet…" : "Senden"}</span>
               </button>
 
               <button 
