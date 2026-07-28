@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useEmail } from "@/lib/emailContext";
 import { flattenLabels, getLabelPath } from "@/lib/labelUtils";
