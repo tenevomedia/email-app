@@ -157,17 +157,16 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
         <div style={{ position: "relative" }} ref={menuRef}>
           <button
             type="button"
-            className="v-Button v-Button--subtle"
+            className="v-Button v-Button--subtle v-Button--iconOnly"
             onClick={() => setMenuOpen(open => !open)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             title="Konto"
-            style={{ padding: "2px 6px", gap: "4px" }}
+            style={{ padding: "2px" }}
           >
             <div className="v-Avatar" style={{ backgroundColor: "#0067b9" }}>
               {initials}
             </div>
-            <ChevronDown size={14} style={{ color: "var(--text-muted)" }} />
           </button>
 
           {menuOpen && (
