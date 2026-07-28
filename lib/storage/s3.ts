@@ -1,17 +1,18 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { ENV } from "@/lib/config/env";
 
-// Configure S3 Client for Cloudflare R2 / AWS S3 / MinIO
-const s3Region = process.env.S3_REGION || "auto";
-const s3Endpoint = process.env.S3_ENDPOINT; // e.g. "https://<account_id>.r2.cloudflarestorage.com"
-const s3AccessKeyId = process.env.S3_ACCESS_KEY_ID || "";
-const s3SecretAccessKey = process.env.S3_SECRET_ACCESS_KEY || "";
-const bucketName = process.env.S3_BUCKET_NAME || "email-app-attachments";
-const publicUrlBase = process.env.S3_PUBLIC_URL; // e.g. "https://media.deinedomain.cc"
+// Configure S3 Client using central ENV configuration
+const s3Region = ENV.S3_REGION;
+const s3Endpoint = ENV.S3_ENDPOINT;
+const s3AccessKeyId = ENV.S3_ACCESS_KEY_ID;
+const s3SecretAccessKey = ENV.S3_SECRET_ACCESS_KEY;
+const bucketName = ENV.S3_BUCKET_NAME;
+const publicUrlBase = ENV.S3_PUBLIC_URL;
 
 export const s3Client = new S3Client({
   region: s3Region,
-  endpoint: s3Endpoint,
+  endpoint: s3Endpoint || undefined,
   credentials: {
     accessKeyId: s3AccessKeyId,
     secretAccessKey: s3SecretAccessKey,

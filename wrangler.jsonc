@@ -5,5 +5,14 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  "pages_build_output_dir": ".vercel/output/static"
+  "pages_build_output_dir": ".vercel/output/static",
+
+  // Runtime Environment Variables defined directly in code
+  // Prevents Cloudflare from purging or overwriting non-secret variables on rebuild
+  "vars": {
+    "NODE_ENV": "production",
+    "NEXT_TELEMETRY_DISABLED": "1",
+    "S3_BUCKET_NAME": "email-app-attachments",
+    "S3_REGION": "auto"
+  }
 }
