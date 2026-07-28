@@ -61,6 +61,11 @@ npm run deploy:cf
 | Variable | Secret? | Herkunft | Bedeutung | Woher |
 |---|---|---|---|---|
 | `DATABASE_URL` | 🔐 Ja | 🔐 Secrets Store | Supabase PostgreSQL Connection String (Pooler URL) | Supabase Dashboard → Settings → Database |
+| `S3_ENDPOINT` | 🔐 Ja | 🔐 Secrets Store | Cloudflare R2 / AWS S3 Endpoint URL (z. B. https://<account_id>.r2.cloudflarestorage.com) | Cloudflare Dashboard → R2 → Bucket Settings |
+| `S3_BUCKET_NAME` | ❌ | 🏗️ Cloudflare Variable | Name des Cloudflare R2 / S3 Buckets (z. B. email-app-attachments) | Cloudflare Dashboard → R2 |
+| `S3_ACCESS_KEY_ID` | 🔐 Ja | 🔐 Secrets Store | Access Key ID für R2 / S3 API | Cloudflare Dashboard → R2 → Manage R2 API Tokens |
+| `S3_SECRET_ACCESS_KEY` | 🔐 Ja | 🔐 Secrets Store | Secret Access Key für R2 / S3 API | Cloudflare Dashboard → R2 → Manage R2 API Tokens |
+| `S3_PUBLIC_URL` | ❌ | 🏗️ Cloudflare Variable | Öffentliche Medien-URL (z. B. https://media.deinedomain.cc) | Cloudflare Dashboard → R2 → Custom Domain |
 | `NEXTAUTH_SECRET` | 🔐 Ja | 🔐 Secrets Store | Secret-Key für Session-Verschlüsselung & JWTs | Generieren (openssl rand -base64 32) |
 | `RESEND_API_KEY` | 🔐 Ja | 🔐 Secrets Store | API-Schlüssel für E-Mail-Versand via Resend (optional) | Resend Dashboard → API Keys |
 | `FASTMAIL_API_TOKEN` | 🔐 Ja | 🔐 Secrets Store | Bearer Token für Fastmail JMAP API (optional) | Fastmail Settings → Password & Security → API Keys |

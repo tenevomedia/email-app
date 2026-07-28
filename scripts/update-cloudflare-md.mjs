@@ -24,40 +24,13 @@ function getProjectInfo() {
 }
 
 function parseEnvVars() {
-  const envVars = new Map();
-
-  // Read .env.example if exists
-  const envExamplePath = join(ROOT, ".env.example");
-  if (existsSync(envExamplePath)) {
-    const lines = readFileSync(envExamplePath, "utf-8").split("\n");
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
-        const [key] = trimmed.split("=");
-        envVars.set(key.trim(), { secret: key.includes("SECRET") || key.includes("KEY") || key.includes("PASSWORD") || key.includes("URL"), build: false });
-      }
-    }
-  }
-
-  // Read .env if exists
-  const envPath = join(ROOT, ".env");
-  if (existsSync(envPath)) {
-    const lines = readFileSync(envPath, "utf-8").split("\n");
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
-        const [key] = trimmed.split("=");
-        const varName = key.trim();
-        if (!envVars.has(varName)) {
-          envVars.set(varName, { secret: varName.includes("SECRET") || varName.includes("KEY") || varName.includes("PASSWORD") || varName.includes("URL"), build: false });
-        }
-      }
-    }
-  }
-
-  // Standard runtime & build variables
   const defaultRuntime = [
     { key: "DATABASE_URL", secret: true, desc: "Supabase PostgreSQL Connection String (Pooler URL)", source: "Supabase Dashboard → Settings → Database" },
+    { key: "S3_ENDPOINT", secret: true, desc: "Cloudflare R2 / AWS S3 Endpoint URL (z. B. https://<account_id>.r2.cloudflarestorage.com)", source: "Cloudflare Dashboard → R2 → Bucket Settings" },
+    { key: "S3_BUCKET_NAME", secret: false, desc: "Name des Cloudflare R2 / S3 Buckets (z. B. email-app-attachments)", source: "Cloudflare Dashboard → R2" },
+    { key: "S3_ACCESS_KEY_ID", secret: true, desc: "Access Key ID für R2 / S3 API", source: "Cloudflare Dashboard → R2 → Manage R2 API Tokens" },
+    { key: "S3_SECRET_ACCESS_KEY", secret: true, desc: "Secret Access Key für R2 / S3 API", source: "Cloudflare Dashboard → R2 → Manage R2 API Tokens" },
+    { key: "S3_PUBLIC_URL", secret: false, desc: "Öffentliche Medien-URL (z. B. https://media.deinedomain.cc)", source: "Cloudflare Dashboard → R2 → Custom Domain" },
     { key: "NEXTAUTH_SECRET", secret: true, desc: "Secret-Key für Session-Verschlüsselung & JWTs", source: "Generieren (openssl rand -base64 32)" },
     { key: "RESEND_API_KEY", secret: true, desc: "API-Schlüssel für E-Mail-Versand via Resend (optional)", source: "Resend Dashboard → API Keys" },
     { key: "FASTMAIL_API_TOKEN", secret: true, desc: "Bearer Token für Fastmail JMAP API (optional)", source: "Fastmail Settings → Password & Security → API Keys" }
