@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { 
   PanelLeftClose, 
   PanelLeft, 
@@ -83,9 +84,14 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           {currentTheme === "dark" ? "☀️ Light" : "🌙 Dark"}
         </button>
 
-        <button className="v-Button v-Button--subtle v-Button--iconOnly" title="Einstellungen">
+        <Link
+          href="/settings"
+          className="v-Button v-Button--subtle v-Button--iconOnly"
+          title="Einstellungen"
+          aria-label="Einstellungen"
+        >
           <Settings size={18} />
-        </button>
+        </Link>
 
         <button className="v-Button v-Button--subtle" title="Hilfe">
           <HelpCircle size={18} />
