@@ -67,7 +67,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           type="text"
           className="v-TextInput-input"
           style={{ paddingLeft: "34px" }}
-          placeholder="Mails suchen (z.B. von:scout24, hat:anhang)"
+          placeholder="Mails suchen"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
         />
