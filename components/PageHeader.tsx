@@ -138,7 +138,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           title="Dark/Light Mode umschalten"
           style={{ fontSize: "12px" }}
         >
-          {currentTheme === "dark" ? "☀️ Light" : "🌙 Dark"}
+          {currentTheme === "dark" ? "Light" : "Dark"}
         </button>
 
         <Link
