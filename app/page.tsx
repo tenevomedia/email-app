@@ -8,7 +8,7 @@ import { MailList } from "@/components/MailList";
 import { ReadingPane } from "@/components/ReadingPane";
 import { ComposeModal } from "@/components/ComposeModal";
 import { EmailMessage } from "@/lib/mockData";
-import { findLabelById, getLabelDescendantIds, getLabelPath, isLabelId } from "@/lib/labelUtils";
+import { findLabelById, getLabelDescendantIds, getLabelPath, isLabelId, emailMatchesFolder } from "@/lib/labelUtils";
 
 export default function MailAppHome() {
   const { 
@@ -24,7 +24,6 @@ export default function MailAppHome() {
     setSelectedEmailId, 
     setSearchQuery, 
     updateSettings, 
-    showToast 
   } = useEmail();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -77,24 +76,10 @@ export default function MailAppHome() {
       return (email.tagIds || []).some(id => matchingIds.has(id));
     }
 
-    if (activeFolderId === 'sent') {
-      return email.badge?.text === 'Gesendet';
-    }
-    if (activeFolderId === 'drafts') {
-      return email.badge?.text === 'Entwurf';
-    }
-    if (activeFolderId === 'trash') {
-      return email.badge?.text === 'Papierkorb';
-    }
-    if (activeFolderId === 'archive') {
-      return email.badge?.text === 'Archiv';
-    }
-
-    // Default inbox excludes trash / sent / drafts / archive
-    return !email.badge || !['Papierkorb', 'Gesendet', 'Entwurf', 'Archiv'].includes(email.badge.text);
+    return emailMatchesFolder(email, activeFolderId);
   });
 
-  const selectedEmail = emails.find(e => e.id === selectedEmailId) || null;
+  const selectedEmail = filteredEmails.find(e => e.id === selectedEmailId) || null;
 
   const currentFolderName =
     folders.find(f => f.id === activeFolderId)?.name ||
@@ -173,12 +158,6 @@ export default function MailAppHome() {
           }}
         >
           <span>{toastMessage}</span>
-          <button 
-            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontWeight: 700, fontSize: "12px" }}
-            onClick={() => showToast("Aktion rückgängig gemacht.")}
-          >
-            Rückgängig (Undo)
-          </button>
         </div>
       )}
     </div>

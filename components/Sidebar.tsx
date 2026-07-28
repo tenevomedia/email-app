@@ -261,10 +261,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <div style={{ padding: "10px 12px", borderTop: "1px solid var(--border-subtle)", fontSize: "11px", color: "var(--text-muted)" }}>
         <div style={{ height: "4px", backgroundColor: "var(--border-subtle)", borderRadius: "2px", overflow: "hidden", marginBottom: "6px" }}>
-          <div style={{ width: "7%", height: "100%", backgroundColor: "var(--accent-primary)" }}></div>
+          <div style={{ width: "0%", height: "100%", backgroundColor: "var(--accent-primary)" }}></div>
         </div>
         <div>
-          <strong style={{ color: "var(--text-main)" }}>7%</strong> von 50 GB verwendet
+          <strong style={{ color: "var(--text-main)" }}>0%</strong> von 50 GB verwendet
         </div>
       </div>
     </aside>

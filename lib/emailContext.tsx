@@ -1,7 +1,8 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect -- Persisted client state must be restored after hydration. */
 
 import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
-import { EmailMessage, Folder, MOCK_EMAILS, MOCK_FOLDERS, MOCK_LABELS } from "./mockData";
+import { EmailMessage, Folder, DEFAULT_EMAILS, DEFAULT_FOLDERS, DEFAULT_LABELS } from "./mockData";
 import {
   findLabelById,
   flattenLabels,
@@ -9,8 +10,10 @@ import {
   getLabelPath,
   isLabelId,
   LABEL_COLOR_PRESETS,
+  withUpdatedFolderCounts,
   withUpdatedLabelCounts,
 } from "./labelUtils";
+import { escapeHtml, parseRecipients } from "./mailValidation";
 
 export interface Identity {
   id: string;
@@ -86,21 +89,22 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'light',
   density: 'comfortable',
   sendDelaySeconds: 15,
-  defaultSignature: 'Mit freundlichen Grüßen,\nAaron Olcaysu',
+  defaultSignature: '',
   smtpRelayProvider: 'provider',
-  identities: [
-    { id: 'id-1', name: 'Aaron Olcaysu', email: 'aaron@olcaysu.cc', signature: 'Beste Grüße,\nAaron', isDefault: true },
-    { id: 'id-2', name: 'Aaron Olcaysu (Scout24)', email: 'aaron.olcaysu@scout24.com', signature: 'Regards,\nAaron Olcaysu | Scout24', isDefault: false },
-    { id: 'id-3', name: 'Aaron Olcaysu (Privat)', email: 'aaron@olcaysu.com', signature: 'Grüße, Aaron', isDefault: false },
-    { id: 'id-4', name: 'Support Team', email: 'support@deinedomain.cc', signature: 'Dein Support-Team', isDefault: false },
-  ],
-  accounts: [
-    { id: 'acc-1', name: 'Fastmail Hauptkonto', email: 'aaron@olcaysu.cc', provider: 'fastmail', imapHost: 'imap.fastmail.com', imapPort: 993, smtpHost: 'smtp.fastmail.com', smtpPort: 465, authType: 'token', isConnected: true },
-    { id: 'acc-2', name: 'Scout24 Business', email: 'aaron.olcaysu@scout24.com', provider: 'outlook', imapHost: 'outlook.office365.com', imapPort: 993, smtpHost: 'smtp.office365.com', smtpPort: 587, authType: 'oauth2', isConnected: true },
-  ]
+  identities: [],
+  accounts: [],
 };
 
-const SYSTEM_BADGE_TEXTS = new Set(['Gesendet', 'Entwurf', 'Papierkorb', 'Archiv']);
+const SYSTEM_BADGE_TEXTS = new Set(['Gesendet', 'Entwurf', 'Papierkorb', 'Archiv', 'Spam']);
+
+/** Erhöhen, um gespeicherte Demo-/Alt-Daten einmalig zu verwerfen */
+const DATA_VERSION = '3-no-demo';
+const STORAGE_KEYS = {
+  version: 'email_app_data_version',
+  emails: 'email_app_emails',
+  labels: 'email_app_labels',
+  settings: 'email_app_settings',
+} as const;
 
 function normalizeEmail(email: EmailMessage): EmailMessage {
   const tagIds = Array.isArray(email.tagIds) ? email.tagIds : [];
@@ -114,28 +118,39 @@ function normalizeEmail(email: EmailMessage): EmailMessage {
 const EmailContext = createContext<EmailContextType | null>(null);
 
 export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [emails, setEmails] = useState<EmailMessage[]>(MOCK_EMAILS);
-  const [folders] = useState<Folder[]>(MOCK_FOLDERS);
-  const [labels, setLabels] = useState<Folder[]>(MOCK_LABELS);
+  const [emails, setEmails] = useState<EmailMessage[]>(DEFAULT_EMAILS);
+  const [folders] = useState<Folder[]>(DEFAULT_FOLDERS);
+  const [labels, setLabels] = useState<Folder[]>(DEFAULT_LABELS);
   const [activeFolderId, setActiveFolderId] = useState("inbox");
-  const [selectedEmailId, setSelectedEmailId] = useState<string | null>("msg-1");
+  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [hasLoadedPersistedState, setHasLoadedPersistedState] = useState(false);
 
-  // Load from localStorage on client mount
+  // Load from localStorage on client mount (Demo-Daten einmalig verwerfen)
   useEffect(() => {
     try {
-      const savedEmails = localStorage.getItem("email_app_emails");
+      const storedVersion = localStorage.getItem(STORAGE_KEYS.version);
+      if (storedVersion !== DATA_VERSION) {
+        localStorage.removeItem(STORAGE_KEYS.emails);
+        localStorage.removeItem(STORAGE_KEYS.labels);
+        localStorage.removeItem(STORAGE_KEYS.settings);
+        localStorage.setItem(STORAGE_KEYS.version, DATA_VERSION);
+        setHasLoadedPersistedState(true);
+        return;
+      }
+
+      const savedEmails = localStorage.getItem(STORAGE_KEYS.emails);
       if (savedEmails) {
         const parsed = JSON.parse(savedEmails) as EmailMessage[];
         setEmails(parsed.map(normalizeEmail));
       }
 
-      const savedLabels = localStorage.getItem("email_app_labels");
+      const savedLabels = localStorage.getItem(STORAGE_KEYS.labels);
       if (savedLabels) setLabels(JSON.parse(savedLabels));
 
-      const savedSettings = localStorage.getItem("email_app_settings");
+      const savedSettings = localStorage.getItem(STORAGE_KEYS.settings);
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
         setSettings(parsed);
@@ -145,30 +160,40 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (e) {
       console.error("Failed to load state from localStorage", e);
+    } finally {
+      setHasLoadedPersistedState(true);
     }
   }, []);
 
   // Persist emails, labels & settings to localStorage
   useEffect(() => {
+    if (!hasLoadedPersistedState) return;
     try {
-      localStorage.setItem("email_app_emails", JSON.stringify(emails));
-    } catch (e) {}
-  }, [emails]);
+      localStorage.setItem(STORAGE_KEYS.emails, JSON.stringify(emails));
+    } catch {}
+  }, [emails, hasLoadedPersistedState]);
 
   useEffect(() => {
+    if (!hasLoadedPersistedState) return;
     try {
-      localStorage.setItem("email_app_labels", JSON.stringify(labels));
-    } catch (e) {}
-  }, [labels]);
+      localStorage.setItem(STORAGE_KEYS.labels, JSON.stringify(labels));
+    } catch {}
+  }, [labels, hasLoadedPersistedState]);
 
   useEffect(() => {
+    if (!hasLoadedPersistedState) return;
     try {
-      localStorage.setItem("email_app_settings", JSON.stringify(settings));
-    } catch (e) {}
-  }, [settings]);
+      localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
+    } catch {}
+  }, [settings, hasLoadedPersistedState]);
+
+  const foldersWithCounts = useMemo(
+    () => withUpdatedFolderCounts(folders, emails),
+    [folders, emails]
+  );
 
   const labelsWithCounts = useMemo(
-    () => withUpdatedLabelCounts(labels, emails.map(e => e.tagIds || [])),
+    () => withUpdatedLabelCounts(labels, emails),
     [labels, emails]
   );
 
@@ -407,24 +432,33 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const sendEmail = async (data: { fromEmail: string; toEmail: string; cc?: string; subject: string; bodyText: string }) => {
     try {
-      await fetch('/api/email/send', {
+      const response = await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-    } catch (e) {}
+      const result = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(result?.error || "Die E-Mail konnte nicht versendet werden.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Die E-Mail konnte nicht versendet werden.";
+      showToast(message);
+      throw error;
+    }
+
+    const recipients = parseRecipients(data.toEmail);
+    const ccRecipients = data.cc?.trim() ? parseRecipients(data.cc) : [];
 
     const newEmail: EmailMessage = {
       id: `msg-${Date.now()}`,
       threadId: `th-${Date.now()}`,
       fromName: 'Aaron Olcaysu',
       fromEmail: data.fromEmail,
-      toName: data.toEmail.split('@')[0],
-      toEmail: data.toEmail,
-      cc: data.cc ? [data.cc] : undefined,
+      toName: recipients[0].split('@')[0],
+      toEmail: recipients.join(', '),
+      cc: ccRecipients.length ? ccRecipients : undefined,
       subject: data.subject || '(Kein Betreff)',
       snippet: data.bodyText.substring(0, 100),
-      bodyHtml: `<p style="font-family: sans-serif; line-height: 1.6;">${data.bodyText.replace(/\n/g, '<br/>')}</p>`,
+      bodyHtml: `<p style="font-family: sans-serif; line-height: 1.6;">${escapeHtml(data.bodyText).replace(/\n/g, '<br/>')}</p>`,
       date: new Date().toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
       formattedTime: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
       size: '14 KB',
@@ -484,7 +518,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <EmailContext.Provider
       value={{
         emails,
-        folders,
+        folders: foldersWithCounts,
         labels: labelsWithCounts,
         activeFolderId,
         selectedEmailId,

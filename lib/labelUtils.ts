@@ -1,4 +1,4 @@
-import { Folder } from "./mockData";
+import { EmailMessage, Folder } from "./mockData";
 
 export const LABEL_COLOR_PRESETS = [
   { colorText: "var(--label-yellow-text)", colorBg: "var(--label-yellow-bg)" },
@@ -10,6 +10,8 @@ export const LABEL_COLOR_PRESETS = [
   { colorText: "var(--label-gray-text)", colorBg: "var(--label-gray-bg)" },
   { colorText: "var(--label-teal-text)", colorBg: "var(--label-teal-bg)" },
 ] as const;
+
+const SYSTEM_FOLDER_BADGES = new Set(['Papierkorb', 'Gesendet', 'Entwurf', 'Archiv', 'Spam']);
 
 export function flattenLabels(labels: Folder[]): Folder[] {
   const result: Folder[] = [];
@@ -57,19 +59,54 @@ export function isLabelId(labels: Folder[], id: string): boolean {
   return findLabelById(labels, id) !== null;
 }
 
-export function withUpdatedLabelCounts(labels: Folder[], tagIdsByEmail: string[][]): Folder[] {
-  const counts = new Map<string, number>();
-  for (const tagIds of tagIdsByEmail) {
-    for (const tagId of tagIds) {
-      counts.set(tagId, (counts.get(tagId) || 0) + 1);
-    }
+export function emailMatchesFolder(email: EmailMessage, folderId: string): boolean {
+  switch (folderId) {
+    case 'inbox':
+      return !email.badge || !SYSTEM_FOLDER_BADGES.has(email.badge.text);
+    case 'drafts':
+      return email.badge?.text === 'Entwurf';
+    case 'sent':
+      return email.badge?.text === 'Gesendet';
+    case 'trash':
+      return email.badge?.text === 'Papierkorb';
+    case 'archive':
+      return email.badge?.text === 'Archiv';
+    case 'spam':
+      return email.badge?.text === 'Spam';
+    case 'scheduled':
+    case 'templates':
+      return false;
+    default:
+      return false;
   }
+}
 
-  const mapLabel = (label: Folder): Folder => ({
-    ...label,
-    count: counts.get(label.id) || 0,
-    children: label.children?.map(mapLabel),
-  });
+/** Label-Zähler = Anzahl Mails, die beim Klick auf das Label sichtbar wären (inkl. Unterlabels) */
+export function withUpdatedLabelCounts(labels: Folder[], emails: EmailMessage[]): Folder[] {
+  const mapLabel = (label: Folder): Folder => {
+    const matchingIds = new Set(getLabelDescendantIds(label));
+    const count = emails.filter(e => (e.tagIds || []).some(id => matchingIds.has(id))).length;
+    return {
+      ...label,
+      count,
+      children: label.children?.map(mapLabel),
+    };
+  };
 
   return labels.map(mapLabel);
+}
+
+/** Ordner-Zähler live aus den vorhandenen E-Mails */
+export function withUpdatedFolderCounts(folders: Folder[], emails: EmailMessage[]): Folder[] {
+  const mapFolder = (folder: Folder): Folder => {
+    const matching = emails.filter(e => emailMatchesFolder(e, folder.id));
+    return {
+      ...folder,
+      count: matching.length,
+      unreadCount: matching.filter(e => !e.isRead).length,
+      children: folder.children?.map(mapFolder),
+    };
+  };
+
+  return folders.map(mapFolder);
 }
