@@ -1,0 +1,123 @@
+// Prisma Schema for Email Client App (Supabase PostgreSQL / SQLite)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  passwordHash String?
+  accounts     Account[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Account {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     String     // "fastmail", "gmail", "outlook", "custom"
+  email        String
+  displayName  String?
+  authType     String     // "token", "password", "oauth2"
+  accessToken  String?
+  refreshToken String?
+  tokenExpiry  DateTime?
+  imapHost     String
+  imapPort     Int        @default(993)
+  smtpHost     String
+  smtpPort     Int        @default(465)
+  isConnected  Boolean    @default(true)
+  folders      Folder[]
+  messages     Message[]
+  identities   Identity[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([userId, email])
+}
+
+model Identity {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name      String
+  email     String   // e.g. "anything@deinedomain.cc" (Custom From Address)
+  signature String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Folder {
+  id          String   @id @default(cuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name        String
+  type        String   // "inbox", "sent", "drafts", "trash", "archive", "junk", "custom"
+  colorText   String?
+  colorBg     String?
+  unreadCount Int      @default(0)
+  totalCount  Int      @default(0)
+  parentId    String?
+  createdAt   DateTime @default(now())
+}
+
+model Message {
+  id            String       @id @default(cuid())
+  accountId     String
+  account       Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  messageId     String?      // RFC Message-ID
+  fromName      String
+  fromEmail     String
+  toName        String
+  toEmail       String
+  cc            String?      // JSON string array
+  subject       String
+  snippet       String
+  bodyHtml      String
+  bodyText      String?
+  date          DateTime
+  formattedTime String
+  size          String       @default("12 KB")
+  isRead        Boolean      @default(false)
+  isStarred     Boolean      @default(false)
+  isPinned      Boolean      @default(false)
+  hasAttachment Boolean      @default(false)
+  badgeText     String?      // e.g. "Privat/Olcaysu.cc", "Gesendet", "Entwurf", "Papierkorb"
+  badgeColorText String?
+  badgeColorBg  String?
+  threadId      String?
+  thread        Thread?      @relation(fields: [threadId], references: [id])
+  attachments   Attachment[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([accountId, date])
+  @@index([fromEmail])
+  @@index([toEmail])
+}
+
+model Thread {
+  id       String    @id @default(cuid())
+  subject  String
+  messages Message[]
+  lastDate DateTime  @default(now())
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  filename  String
+  mimeType  String
+  size      Int
+  url       String?
+  createdAt DateTime @default(now())
+}
