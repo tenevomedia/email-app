@@ -53,9 +53,7 @@ export interface EmailMessage {
 /** Systemordner ohne Demo-Zähler — Counts werden live aus den E-Mails berechnet */
 export const DEFAULT_FOLDERS: Folder[] = [
   { id: 'inbox', name: 'Posteingang', type: 'inbox', count: 0, unreadCount: 0, depth: 0 },
-  { id: 'drafts', name: 'Entwürfe', type: 'drafts', count: 0, depth: 0, children: [
-    { id: 'templates', name: 'Template', type: 'custom', count: 0, depth: 1 }
-  ]},
+  { id: 'drafts', name: 'Entwürfe', type: 'drafts', count: 0, depth: 0 },
   { id: 'scheduled', name: 'Geplant', type: 'scheduled', count: 0, depth: 0 },
   { id: 'sent', name: 'Gesendet', type: 'sent', count: 0, depth: 0 },
   { id: 'spam', name: 'Spam', type: 'junk', count: 0, depth: 0 },

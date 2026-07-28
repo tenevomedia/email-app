@@ -74,7 +74,6 @@ export function emailMatchesFolder(email: EmailMessage, folderId: string): boole
     case 'spam':
       return email.badge?.text === 'Spam';
     case 'scheduled':
-    case 'templates':
       return false;
     default:
       return false;
