@@ -3,11 +3,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useEmail } from "@/lib/emailContext";
+import { flattenLabels, getLabelPath } from "@/lib/labelUtils";
+import { Folder } from "@/lib/mockData";
 import {
   ArrowLeft, Search, Settings as SettingsIcon, HelpCircle, ChevronDown,
   CreditCard, Users, Globe, Palette, Sliders, Bell, Hand, WifiOff,
   ShieldCheck, ArrowLeftRight, RotateCcw, Calendar, Mail, Tag, Filter,
-  Umbrella, Sun, Moon, Check, Plus, Trash2, Server, X
+  Umbrella, Sun, Moon, Check, Plus, Trash2, Server
 } from "lucide-react";
 
 type SidebarItem = {
@@ -59,7 +61,10 @@ const THEME_SWATCHES = [
 ];
 
 export default function FastmailSettingsPage() {
-  const { settings, updateSettings, addIdentity, deleteIdentity, addAccount, showToast } = useEmail();
+  const {
+    settings, updateSettings, addIdentity, deleteIdentity, addAccount,
+    labels, createLabel, deleteLabel,
+  } = useEmail();
   const [activeSection, setActiveSection] = useState("theme");
   const [settingsSearch, setSettingsSearch] = useState("");
   const [selectedThemeSwatch, setSelectedThemeSwatch] = useState("default");
@@ -75,6 +80,12 @@ export default function FastmailSettingsPage() {
   const [accName, setAccName] = useState("");
   const [accEmail, setAccEmail] = useState("");
   const [accProvider, setAccProvider] = useState<'fastmail' | 'gmail' | 'outlook' | 'custom'>('fastmail');
+
+  // Label form
+  const [newLabelName, setNewLabelName] = useState("");
+  const [newLabelParentId, setNewLabelParentId] = useState("");
+
+  const flatLabels = flattenLabels(labels);
 
   const handleAddIdentity = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +105,25 @@ export default function FastmailSettingsPage() {
       smtpPort: 465, authType: 'token', isConnected: true
     });
     setAccName(""); setAccEmail("");
+  };
+
+  const handleAddLabel = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLabelName.trim()) return;
+    createLabel(newLabelName, newLabelParentId || undefined);
+    setNewLabelName("");
+    setNewLabelParentId("");
+  };
+
+  const handleDeleteLabel = (label: Folder) => {
+    const path = getLabelPath(labels, label.id) || label.name;
+    const hasChildren = Boolean(label.children?.length);
+    const msg = hasChildren
+      ? `Label „${path}“ und alle Unterlabels wirklich löschen?`
+      : `Label „${path}“ wirklich löschen?`;
+    if (window.confirm(msg)) {
+      deleteLabel(label.id);
+    }
   };
 
   // Scroll to section when sidebar item is clicked
@@ -550,6 +580,88 @@ export default function FastmailSettingsPage() {
                   </div>
                   <button type="submit" className="v-Button v-Button--cta" style={{ marginTop: "14px" }}>
                     <Plus size={15} /> Konto verbinden
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {/* ── LABELS ── */}
+          <div className="v-SettingsPane-section" id="s-folders">
+            <div className="v-SettingsPane-row">
+              <div className="v-SettingsPane-label">
+                <h2>Labels</h2>
+              </div>
+              <div className="v-SettingsPane-controls">
+                <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                  Labels erstellen und löschen. In der Sidebar kannst du Labels nur zuweisen und filtern.
+                </p>
+
+                {flatLabels.map((label) => {
+                  const path = getLabelPath(labels, label.id) || label.name;
+                  return (
+                    <div key={label.id} className="v-SettingsCard">
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: 1 }}>
+                        <span
+                          style={{
+                            width: "10px",
+                            height: "10px",
+                            borderRadius: "50%",
+                            backgroundColor: label.colorText || "var(--accent-primary)",
+                            flexShrink: 0,
+                          }}
+                        />
+                        <div style={{ minWidth: 0 }}>
+                          <strong style={{ fontSize: "14px" }}>{path}</strong>
+                          <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
+                            {(label.count || 0)} E-Mail{(label.count || 0) === 1 ? "" : "s"}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="v-Button v-Button--subtle"
+                        title="Label löschen"
+                        onClick={() => handleDeleteLabel(label)}
+                        style={{ color: "var(--label-red-text)" }}
+                      >
+                        <Trash2 size={15} />
+                        <span>Löschen</span>
+                      </button>
+                    </div>
+                  );
+                })}
+
+                <form className="v-SettingsForm" onSubmit={handleAddLabel}>
+                  <h3>Neues Label erstellen</h3>
+                  <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                    <div className="form-field">
+                      <label>Name</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="z. B. Projekte"
+                        value={newLabelName}
+                        onChange={(e) => setNewLabelName(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label>Übergeordnetes Label (optional)</label>
+                      <select
+                        value={newLabelParentId}
+                        onChange={(e) => setNewLabelParentId(e.target.value)}
+                      >
+                        <option value="">Kein Parent (Top-Level)</option>
+                        {flatLabels.map((label) => (
+                          <option key={label.id} value={label.id}>
+                            {getLabelPath(labels, label.id) || label.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <button type="submit" className="v-Button v-Button--cta" style={{ marginTop: "14px" }}>
+                    <Plus size={15} /> Label erstellen
                   </button>
                 </form>
               </div>

@@ -16,8 +16,7 @@ import {
   ChevronRight, 
   ChevronDown, 
   Plus, 
-  Search,
-  X
+  Search
 } from "lucide-react";
 
 interface SidebarProps {
@@ -35,7 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectFolder,
   onOpenCompose,
 }) => {
-  const { createLabel, deleteLabel } = useEmail();
+  const { createLabel } = useEmail();
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
     drafts: true,
     private: true,
@@ -123,31 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }}>
               {item.count}
             </span>
-          )}
-
-          {isLabel && !hasChildren && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (window.confirm(`Label „${item.name}“ wirklich löschen?`)) {
-                  deleteLabel(item.id);
-                }
-              }}
-              title="Label löschen"
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-subtle)",
-                cursor: "pointer",
-                padding: "2px",
-                display: "flex",
-                alignItems: "center",
-                opacity: 0.5,
-              }}
-              className="v-LabelDelete"
-            >
-              <X size={12} />
-            </button>
           )}
 
           {hasChildren && (
