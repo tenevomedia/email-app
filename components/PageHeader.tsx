@@ -150,9 +150,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           <Settings size={18} />
         </Link>
 
-        <button className="v-Button v-Button--subtle" title="Hilfe">
+        <button className="v-Button v-Button--subtle v-Button--iconOnly" title="Hilfe">
           <HelpCircle size={18} />
-          <ChevronDown size={14} />
         </button>
 
         <div style={{ position: "relative" }} ref={menuRef}>
