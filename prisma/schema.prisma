@@ -38,6 +38,7 @@ model Account {
   folders      Folder[]
   messages     Message[]
   identities   Identity[]
+  tags         Tag[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -69,6 +70,34 @@ model Folder {
   createdAt   DateTime @default(now())
 }
 
+model Tag {
+  id        String       @id @default(cuid())
+  accountId String
+  account   Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name      String
+  colorText String?
+  colorBg   String?
+  parentId  String?
+  parent    Tag?         @relation("TagHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Tag[]        @relation("TagHierarchy")
+  messages  MessageTag[]
+  createdAt DateTime     @default(now())
+
+  @@unique([accountId, name, parentId])
+  @@index([accountId])
+}
+
+model MessageTag {
+  messageId String
+  tagId     String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([messageId, tagId])
+  @@index([tagId])
+}
+
 model Message {
   id            String       @id @default(cuid())
   accountId     String
@@ -90,12 +119,13 @@ model Message {
   isStarred     Boolean      @default(false)
   isPinned      Boolean      @default(false)
   hasAttachment Boolean      @default(false)
-  badgeText     String?      // e.g. "Privat/Olcaysu.cc", "Gesendet", "Entwurf", "Papierkorb"
+  badgeText     String?      // Ordnerstatus: "Gesendet", "Entwurf", "Papierkorb", "Archiv"
   badgeColorText String?
   badgeColorBg  String?
   threadId      String?
   thread        Thread?      @relation(fields: [threadId], references: [id])
   attachments   Attachment[]
+  tags          MessageTag[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 

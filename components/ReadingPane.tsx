@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { EmailMessage } from "@/lib/mockData";
 import { useEmail } from "@/lib/emailContext";
+import { flattenLabels } from "@/lib/labelUtils";
 import { 
   Archive, 
   Trash2, 
-  Clock, 
   Tag, 
   MoreHorizontal, 
   Printer, 
@@ -19,7 +19,8 @@ import {
   Forward,
   Mail,
   MailOpen,
-  X
+  X,
+  Check
 } from "lucide-react";
 
 interface ReadingPaneProps {
@@ -33,13 +34,26 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
     deleteEmail, 
     togglePinEmail, 
     toggleReadState, 
-    assignLabelToEmail, 
-    removeLabelFromEmail,
+    toggleTagOnEmail, 
+    removeTagFromEmail,
+    getTagsForEmail,
     labels 
   } = useEmail();
 
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [showLabelMenu, setShowLabelMenu] = useState(false);
+  const labelMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showLabelMenu) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (labelMenuRef.current && !labelMenuRef.current.contains(event.target as Node)) {
+        setShowLabelMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [showLabelMenu]);
 
   if (!email) {
     return (
@@ -51,9 +65,12 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
     );
   }
 
+  const emailTags = getTagsForEmail(email);
+  const flatLabels = flattenLabels(labels);
+  const assigned = new Set(email.tagIds || []);
+
   return (
     <div className="v-Split--readingpane">
-      {/* Top Action Toolbar */}
       <div 
         style={{ 
           height: "var(--toolbar-height)", 
@@ -91,8 +108,7 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
 
         <span style={{ height: "16px", width: "1px", backgroundColor: "var(--border-subtle)" }} />
 
-        {/* Labels Dropdown Menu */}
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative" }} ref={labelMenuRef}>
           <button 
             className="v-Button v-Button--subtle" 
             title="Labels" 
@@ -115,40 +131,47 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
                 borderRadius: "var(--radius-md)", 
                 boxShadow: "var(--shadow-dropdown)", 
                 zIndex: 50, 
-                minWidth: "160px",
+                minWidth: "220px",
+                maxHeight: "280px",
+                overflowY: "auto",
                 padding: "6px 0"
               }}
             >
               <div style={{ padding: "4px 12px", fontSize: "11px", fontWeight: 700, color: "var(--text-subtle)", textTransform: "uppercase" }}>
-                Label zuweisen
+                Labels zuweisen
               </div>
 
-              {labels.map(l => (
-                <button
-                  key={l.id}
-                  style={{
-                    width: "100%",
-                    padding: "6px 12px",
-                    textAlign: "left",
-                    background: "none",
-                    border: "none",
-                    fontSize: "12px",
-                    color: "var(--text-main)",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px"
-                  }}
-                  className="v-Button--subtle"
-                  onClick={() => {
-                    assignLabelToEmail(email.id, l.name, l.colorText || 'var(--text-main)', l.colorBg || 'var(--bg-hover)');
-                    setShowLabelMenu(false);
-                  }}
-                >
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: l.colorText || "var(--accent-primary)" }} />
-                  <span>{l.name}</span>
-                </button>
-              ))}
+              {flatLabels.map(l => {
+                const isOn = assigned.has(l.id);
+                const indent = (l.depth || 0) * 12;
+                return (
+                  <button
+                    key={l.id}
+                    style={{
+                      width: "100%",
+                      padding: "6px 12px",
+                      paddingLeft: `${12 + indent}px`,
+                      textAlign: "left",
+                      background: isOn ? "var(--bg-selected)" : "none",
+                      border: "none",
+                      fontSize: "12px",
+                      color: "var(--text-main)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px"
+                    }}
+                    className="v-Button--subtle"
+                    onClick={() => toggleTagOnEmail(email.id, l.id)}
+                  >
+                    <span style={{ width: "14px", display: "inline-flex", justifyContent: "center" }}>
+                      {isOn ? <Check size={13} style={{ color: "var(--accent-primary)" }} /> : null}
+                    </span>
+                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: l.colorText || "var(--accent-primary)", flexShrink: 0 }} />
+                    <span className="u-truncate">{l.name}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -163,9 +186,7 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
         <div style={{ flex: 1 }} />
       </div>
 
-      {/* Main Reading Scroll Container */}
       <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
-        {/* Thread Title & Header Buttons */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "16px" }}>
           <h1 style={{ fontSize: "22px", fontWeight: 700, color: "var(--text-main)", lineHeight: 1.3 }}>
             {email.subject}
@@ -181,29 +202,32 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
           </div>
         </div>
 
-        {/* Thread Badges */}
-        <div style={{ display: "flex", gap: "6px", marginBottom: "20px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "20px" }}>
           <span className="u-badge" style={{ backgroundColor: "var(--bg-hover)", color: "var(--text-muted)" }}>
-            Posteingang
+            {email.badge?.text === 'Papierkorb' ? 'Papierkorb'
+              : email.badge?.text === 'Archiv' ? 'Archiv'
+              : email.badge?.text === 'Gesendet' ? 'Gesendet'
+              : email.badge?.text === 'Entwurf' ? 'Entwurf'
+              : 'Posteingang'}
           </span>
-          {email.badge && (
+          {emailTags.map(tag => (
             <span 
+              key={tag.id}
               className="u-badge" 
-              style={{ color: email.badge.colorText, backgroundColor: email.badge.colorBg, display: "inline-flex", alignItems: "center", gap: "4px" }}
+              style={{ color: tag.colorText, backgroundColor: tag.colorBg, display: "inline-flex", alignItems: "center", gap: "4px" }}
             >
-              <span>{email.badge.text}</span>
+              <span>{tag.path}</span>
               <span 
                 style={{ cursor: "pointer", display: "inline-flex", alignItems: "center" }} 
-                onClick={() => removeLabelFromEmail(email.id)}
+                onClick={() => removeTagFromEmail(email.id, tag.id)}
                 title="Label entfernen"
               >
                 <X size={12} />
               </span>
             </span>
-          )}
+          ))}
         </div>
 
-        {/* Message Card Container */}
         <div 
           style={{ 
             backgroundColor: "var(--bg-card)", 
@@ -213,7 +237,6 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
             overflow: "hidden"
           }}
         >
-          {/* Header Bar inside Card */}
           <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border-subtle)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <div 
@@ -246,7 +269,6 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
                 </div>
               </div>
 
-              {/* Top Card Actions */}
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ fontSize: "12px", color: "var(--text-subtle)", marginRight: "8px" }}>
                   {email.formattedTime}
@@ -275,7 +297,6 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
               </div>
             </div>
 
-            {/* Extended Details Dropdown */}
             {detailsOpen && (
               <div 
                 style={{ 
@@ -314,13 +335,11 @@ export const ReadingPane: React.FC<ReadingPaneProps> = ({ email, onOpenComposeWi
             )}
           </div>
 
-          {/* HTML Email Body Container */}
           <div 
             style={{ padding: "24px", color: "var(--text-main)", fontSize: "14px", lineHeight: "1.6" }}
             dangerouslySetInnerHTML={{ __html: email.bodyHtml }}
           />
 
-          {/* Bottom Reply Buttons inside Card */}
           <div 
             style={{ 
               padding: "14px 20px", 

@@ -8,6 +8,7 @@ import { MailList } from "@/components/MailList";
 import { ReadingPane } from "@/components/ReadingPane";
 import { ComposeModal } from "@/components/ComposeModal";
 import { EmailMessage } from "@/lib/mockData";
+import { findLabelById, getLabelDescendantIds, getLabelPath, isLabelId } from "@/lib/labelUtils";
 
 export default function MailAppHome() {
   const { 
@@ -57,7 +58,7 @@ export default function MailAppHome() {
     setIsComposeOpen(true);
   };
 
-  // Filter emails based on folder or search query
+  // Filter emails based on folder, label/tag, or search query
   const filteredEmails = emails.filter(email => {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -67,6 +68,13 @@ export default function MailAppHome() {
         email.fromEmail.toLowerCase().includes(q) ||
         email.snippet.toLowerCase().includes(q)
       );
+    }
+
+    if (isLabelId(labels, activeFolderId)) {
+      const label = findLabelById(labels, activeFolderId);
+      if (!label) return false;
+      const matchingIds = new Set(getLabelDescendantIds(label));
+      return (email.tagIds || []).some(id => matchingIds.has(id));
     }
 
     if (activeFolderId === 'sent') {
@@ -82,16 +90,15 @@ export default function MailAppHome() {
       return email.badge?.text === 'Archiv';
     }
 
-    // Default inbox excludes trash
-    return email.badge?.text !== 'Papierkorb';
+    // Default inbox excludes trash / sent / drafts / archive
+    return !email.badge || !['Papierkorb', 'Gesendet', 'Entwurf', 'Archiv'].includes(email.badge.text);
   });
 
   const selectedEmail = emails.find(e => e.id === selectedEmailId) || null;
 
-  // Folder Name Resolution
-  const currentFolderName = 
+  const currentFolderName =
     folders.find(f => f.id === activeFolderId)?.name ||
-    labels.find(l => l.id === activeFolderId)?.name ||
+    getLabelPath(labels, activeFolderId) ||
     "Posteingang";
 
   return (

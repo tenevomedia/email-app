@@ -37,11 +37,14 @@ export interface EmailMessage {
   isPinned: boolean;
   hasAttachment: boolean;
   threadCount?: number;
+  /** System-Ordnerstatus (Gesendet, Entwurf, Papierkorb, Archiv) — getrennt von Tags */
   badge?: {
     text: string;
     colorText: string;
     colorBg: string;
   };
+  /** IDs der zugewiesenen Labels/Tags (Mehrfachzuweisung) */
+  tagIds: string[];
   avatarUrl?: string;
   avatarInitials?: string;
   avatarColorClass?: string;
@@ -96,11 +99,7 @@ export const MOCK_EMAILS: EmailMessage[] = [
     isStarred: false,
     isPinned: false,
     hasAttachment: false,
-    badge: {
-      text: 'Privat/Olcaysu.cc',
-      colorText: 'var(--label-gray-text)',
-      colorBg: 'var(--label-gray-bg)'
-    },
+    tagIds: ['priv-olcaysu-cc', 'important'],
     avatarInitials: 'AO',
     avatarColorClass: '#ff9626',
     bodyHtml: `
@@ -154,11 +153,7 @@ export const MOCK_EMAILS: EmailMessage[] = [
     isPinned: false,
     hasAttachment: false,
     threadCount: 2,
-    badge: {
-      text: 'Privat/Olcaysu.cc',
-      colorText: 'var(--label-gray-text)',
-      colorBg: 'var(--label-gray-bg)'
-    },
+    tagIds: ['priv-olcaysu-cc', 'purchases'],
     avatarInitials: 'ST',
     avatarColorClass: '#0067b9',
     bodyHtml: `
@@ -188,11 +183,7 @@ export const MOCK_EMAILS: EmailMessage[] = [
     isPinned: false,
     hasAttachment: true,
     threadCount: 3,
-    badge: {
-      text: 'Privat/Olcaysu.com',
-      colorText: 'var(--label-green-text)',
-      colorBg: 'var(--label-green-bg)'
-    },
+    tagIds: ['priv-olcaysu-com', 'important'],
     avatarInitials: 'DO',
     avatarColorClass: '#388e3c',
     bodyHtml: `
@@ -221,11 +212,7 @@ export const MOCK_EMAILS: EmailMessage[] = [
     isStarred: false,
     isPinned: false,
     hasAttachment: false,
-    badge: {
-      text: 'Privat/Olcaysu.cc',
-      colorText: 'var(--label-gray-text)',
-      colorBg: 'var(--label-gray-bg)'
-    },
+    tagIds: ['priv-olcaysu-cc'],
     avatarInitials: 'AP',
     avatarColorClass: '#e12162',
     bodyHtml: `
@@ -253,11 +240,7 @@ export const MOCK_EMAILS: EmailMessage[] = [
     isStarred: false,
     isPinned: false,
     hasAttachment: false,
-    badge: {
-      text: 'Privat/Yahoo',
-      colorText: 'var(--label-gray-text)',
-      colorBg: 'var(--label-gray-bg)'
-    },
+    tagIds: ['priv-yahoo'],
     avatarInitials: 'EP',
     avatarColorClass: '#5e174d',
     bodyHtml: `
@@ -285,6 +268,7 @@ export const MOCK_EMAILS: EmailMessage[] = [
     isStarred: false,
     isPinned: false,
     hasAttachment: false,
+    tagIds: ['invoices'],
     avatarInitials: 'SN',
     avatarColorClass: '#04917f',
     bodyHtml: `

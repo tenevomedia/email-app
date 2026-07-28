@@ -1,7 +1,16 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { EmailMessage, Folder, MOCK_EMAILS, MOCK_FOLDERS, MOCK_LABELS } from "./mockData";
+import {
+  findLabelById,
+  flattenLabels,
+  getLabelDescendantIds,
+  getLabelPath,
+  isLabelId,
+  LABEL_COLOR_PRESETS,
+  withUpdatedLabelCounts,
+} from "./labelUtils";
 
 export interface Identity {
   id: string;
@@ -58,8 +67,11 @@ interface EmailContextType {
   toggleReadState: (id: string) => void;
   toggleStarState: (id: string) => void;
   moveEmailToFolder: (id: string, targetFolderId: string) => void;
-  assignLabelToEmail: (id: string, labelText: string, colorText: string, colorBg: string) => void;
-  removeLabelFromEmail: (id: string) => void;
+  toggleTagOnEmail: (emailId: string, tagId: string) => void;
+  removeTagFromEmail: (emailId: string, tagId: string) => void;
+  createLabel: (name: string, parentId?: string) => void;
+  deleteLabel: (tagId: string) => void;
+  getTagsForEmail: (email: EmailMessage) => Array<{ id: string; name: string; path: string; colorText: string; colorBg: string }>;
   saveDraft: (draft: Partial<EmailMessage>) => void;
   sendEmail: (data: { fromEmail: string; toEmail: string; cc?: string; subject: string; bodyText: string }) => Promise<void>;
   
@@ -88,11 +100,22 @@ const DEFAULT_SETTINGS: AppSettings = {
   ]
 };
 
+const SYSTEM_BADGE_TEXTS = new Set(['Gesendet', 'Entwurf', 'Papierkorb', 'Archiv']);
+
+function normalizeEmail(email: EmailMessage): EmailMessage {
+  const tagIds = Array.isArray(email.tagIds) ? email.tagIds : [];
+  // Migration: früheres Badge-als-Label in Tags übernehmen, wenn kein System-Status
+  if (tagIds.length === 0 && email.badge?.text && !SYSTEM_BADGE_TEXTS.has(email.badge.text)) {
+    return { ...email, tagIds: [], badge: undefined };
+  }
+  return { ...email, tagIds };
+}
+
 const EmailContext = createContext<EmailContextType | null>(null);
 
 export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [emails, setEmails] = useState<EmailMessage[]>(MOCK_EMAILS);
-  const [folders, setFolders] = useState<Folder[]>(MOCK_FOLDERS);
+  const [folders] = useState<Folder[]>(MOCK_FOLDERS);
   const [labels, setLabels] = useState<Folder[]>(MOCK_LABELS);
   const [activeFolderId, setActiveFolderId] = useState("inbox");
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>("msg-1");
@@ -104,7 +127,13 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     try {
       const savedEmails = localStorage.getItem("email_app_emails");
-      if (savedEmails) setEmails(JSON.parse(savedEmails));
+      if (savedEmails) {
+        const parsed = JSON.parse(savedEmails) as EmailMessage[];
+        setEmails(parsed.map(normalizeEmail));
+      }
+
+      const savedLabels = localStorage.getItem("email_app_labels");
+      if (savedLabels) setLabels(JSON.parse(savedLabels));
 
       const savedSettings = localStorage.getItem("email_app_settings");
       if (savedSettings) {
@@ -119,7 +148,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  // Persist emails & settings to localStorage
+  // Persist emails, labels & settings to localStorage
   useEffect(() => {
     try {
       localStorage.setItem("email_app_emails", JSON.stringify(emails));
@@ -128,15 +157,42 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     try {
+      localStorage.setItem("email_app_labels", JSON.stringify(labels));
+    } catch (e) {}
+  }, [labels]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem("email_app_settings", JSON.stringify(settings));
     } catch (e) {}
   }, [settings]);
+
+  const labelsWithCounts = useMemo(
+    () => withUpdatedLabelCounts(labels, emails.map(e => e.tagIds || [])),
+    [labels, emails]
+  );
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
+  };
+
+  const getTagsForEmail = (email: EmailMessage) => {
+    return (email.tagIds || [])
+      .map(tagId => {
+        const label = findLabelById(labels, tagId);
+        if (!label) return null;
+        return {
+          id: label.id,
+          name: label.name,
+          path: getLabelPath(labels, label.id) || label.name,
+          colorText: label.colorText || "var(--text-main)",
+          colorBg: label.colorBg || "var(--bg-hover)",
+        };
+      })
+      .filter((t): t is NonNullable<typeof t> => t !== null);
   };
 
   // Actions implementation
@@ -154,18 +210,16 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteEmail = (id: string) => {
     setEmails(prev => prev.map(e => {
       if (e.id === id) {
-        // If already in trash, delete permanently or move to trash
         const isTrash = e.badge?.text === 'Papierkorb';
         if (isTrash) {
           showToast("E-Mail dauerhaft gelöscht");
-          return null as any;
-        } else {
-          showToast("E-Mail in den Papierkorb verschoben");
-          return {
-            ...e,
-            badge: { text: 'Papierkorb', colorText: 'var(--label-red-text)', colorBg: 'var(--label-red-bg)' }
-          };
+          return null as unknown as EmailMessage;
         }
+        showToast("E-Mail in den Papierkorb verschoben");
+        return {
+          ...e,
+          badge: { text: 'Papierkorb', colorText: 'var(--label-red-text)', colorBg: 'var(--label-red-bg)' }
+        };
       }
       return e;
     }).filter(Boolean));
@@ -219,26 +273,102 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
   };
 
-  const assignLabelToEmail = (id: string, labelText: string, colorText: string, colorBg: string) => {
+  const toggleTagOnEmail = (emailId: string, tagId: string) => {
+    const label = findLabelById(labels, tagId);
+    if (!label) return;
+
     setEmails(prev => prev.map(e => {
-      if (e.id === id) {
-        showToast(`Label "${labelText}" zugewiesen`);
-        return {
-          ...e,
-          badge: { text: labelText, colorText, colorBg }
-        };
-      }
-      return e;
+      if (e.id !== emailId) return e;
+      const current = e.tagIds || [];
+      const hasTag = current.includes(tagId);
+      const tagIds = hasTag
+        ? current.filter(id => id !== tagId)
+        : [...current, tagId];
+      showToast(hasTag ? `Label „${label.name}“ entfernt` : `Label „${label.name}“ zugewiesen`);
+      return { ...e, tagIds };
     }));
   };
 
-  const removeLabelFromEmail = (id: string) => {
+  const removeTagFromEmail = (emailId: string, tagId: string) => {
+    const label = findLabelById(labels, tagId);
     setEmails(prev => prev.map(e => {
-      if (e.id === id) {
-        return { ...e, badge: undefined };
-      }
-      return e;
+      if (e.id !== emailId) return e;
+      return { ...e, tagIds: (e.tagIds || []).filter(id => id !== tagId) };
     }));
+    showToast(label ? `Label „${label.name}“ entfernt` : "Label entfernt");
+  };
+
+  const createLabel = (name: string, parentId?: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+
+    const existing = flattenLabels(labels).some(
+      l => l.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (existing) {
+      showToast(`Label „${trimmed}“ existiert bereits`);
+      return;
+    }
+
+    const colors = LABEL_COLOR_PRESETS[Math.floor(Math.random() * LABEL_COLOR_PRESETS.length)];
+    const newLabel: Folder = {
+      id: `label-${Date.now()}`,
+      name: trimmed,
+      type: 'custom',
+      count: 0,
+      colorText: colors.colorText,
+      colorBg: colors.colorBg,
+      depth: parentId ? 1 : 0,
+    };
+
+    setLabels(prev => {
+      if (!parentId) return [...prev, newLabel];
+
+      const addChild = (items: Folder[]): Folder[] =>
+        items.map(item => {
+          if (item.id === parentId) {
+            return {
+              ...item,
+              children: [...(item.children || []), { ...newLabel, depth: (item.depth || 0) + 1 }],
+            };
+          }
+          if (item.children?.length) {
+            return { ...item, children: addChild(item.children) };
+          }
+          return item;
+        });
+
+      return addChild(prev);
+    });
+
+    showToast(`Label „${trimmed}“ erstellt`);
+  };
+
+  const deleteLabel = (tagId: string) => {
+    const label = findLabelById(labels, tagId);
+    if (!label) return;
+
+    const idsToRemove = new Set(getLabelDescendantIds(label));
+
+    const removeFromTree = (items: Folder[]): Folder[] =>
+      items
+        .filter(item => !idsToRemove.has(item.id))
+        .map(item => ({
+          ...item,
+          children: item.children ? removeFromTree(item.children) : undefined,
+        }));
+
+    setLabels(prev => removeFromTree(prev));
+    setEmails(prev => prev.map(e => ({
+      ...e,
+      tagIds: (e.tagIds || []).filter(id => !idsToRemove.has(id)),
+    })));
+
+    if (isLabelId(labels, activeFolderId) && idsToRemove.has(activeFolderId)) {
+      setActiveFolderId('inbox');
+    }
+
+    showToast(`Label „${label.name}“ gelöscht`);
   };
 
   const saveDraft = (draft: Partial<EmailMessage>) => {
@@ -246,7 +376,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (existingIndex >= 0) {
       setEmails(prev => {
         const copy = [...prev];
-        copy[existingIndex] = { ...copy[existingIndex], ...draft };
+        copy[existingIndex] = { ...copy[existingIndex], ...draft, tagIds: draft.tagIds ?? copy[existingIndex].tagIds };
         return copy;
       });
     } else {
@@ -267,6 +397,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isStarred: false,
         isPinned: false,
         hasAttachment: false,
+        tagIds: draft.tagIds || [],
         badge: { text: 'Entwurf', colorText: 'var(--label-yellow-text)', colorBg: 'var(--label-yellow-bg)' }
       };
       setEmails(prev => [newDraft, ...prev]);
@@ -275,14 +406,12 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const sendEmail = async (data: { fromEmail: string; toEmail: string; cc?: string; subject: string; bodyText: string }) => {
-    // Mock API call or real send API
     try {
-      const res = await fetch('/api/email/send', {
+      await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      // Even if offline/fallback:
     } catch (e) {}
 
     const newEmail: EmailMessage = {
@@ -303,6 +432,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isStarred: false,
       isPinned: false,
       hasAttachment: false,
+      tagIds: [],
       badge: { text: 'Gesendet', colorText: 'var(--label-blue-text)', colorBg: 'var(--label-blue-bg)' },
       avatarInitials: 'AO',
       avatarColorClass: '#0067b9'
@@ -355,7 +485,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       value={{
         emails,
         folders,
-        labels,
+        labels: labelsWithCounts,
         activeFolderId,
         selectedEmailId,
         searchQuery,
@@ -371,8 +501,11 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleReadState,
         toggleStarState,
         moveEmailToFolder,
-        assignLabelToEmail,
-        removeLabelFromEmail,
+        toggleTagOnEmail,
+        removeTagFromEmail,
+        createLabel,
+        deleteLabel,
+        getTagsForEmail,
         saveDraft,
         sendEmail,
         updateSettings,

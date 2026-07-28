@@ -32,7 +32,7 @@ export const MailList: React.FC<MailListProps> = ({
   folderName,
   onOpenDraft,
 }) => {
-  const { togglePinEmail, deleteEmail, archiveEmail, toggleReadState } = useEmail();
+  const { togglePinEmail, deleteEmail, archiveEmail, toggleReadState, getTagsForEmail } = useEmail();
   const [checkedIds, setCheckedIds] = useState<Record<string, boolean>>({});
   const [allChecked, setAllChecked] = useState(false);
 
@@ -106,6 +106,7 @@ export const MailList: React.FC<MailListProps> = ({
         ) : (
           sortedEmails.map((email) => {
             const isSelected = selectedEmailId === email.id;
+            const emailTags = getTagsForEmail(email);
 
             return (
               <div
@@ -181,14 +182,28 @@ export const MailList: React.FC<MailListProps> = ({
                   {email.snippet}
                 </div>
 
-                {/* Bottom row: Badges, attachments, size */}
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
-                  {email.badge && (
+                {/* Bottom row: Tags / folder badge, attachments, size */}
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
+                  {email.badge && ['Gesendet', 'Entwurf', 'Papierkorb', 'Archiv'].includes(email.badge.text) && (
                     <span 
                       className="u-badge" 
                       style={{ color: email.badge.colorText, backgroundColor: email.badge.colorBg }}
                     >
                       {email.badge.text}
+                    </span>
+                  )}
+                  {emailTags.slice(0, 2).map(tag => (
+                    <span
+                      key={tag.id}
+                      className="u-badge"
+                      style={{ color: tag.colorText, backgroundColor: tag.colorBg }}
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+                  {emailTags.length > 2 && (
+                    <span className="u-badge" style={{ color: "var(--text-muted)", backgroundColor: "var(--bg-hover)" }}>
+                      +{emailTags.length - 2}
                     </span>
                   )}
 
