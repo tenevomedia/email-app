@@ -8,6 +8,7 @@
     "build:cf": "npx @cloudflare/next-on-pages",
     "preview:cf": "npx wrangler pages dev .vercel/output/static",
     "deploy:cf": "npx @cloudflare/next-on-pages && npx wrangler pages deploy .vercel/output/static --project-name=email-app",
+    "update:cloudflare": "node scripts/update-cloudflare-md.mjs --write",
     "start": "next start",
     "lint": "eslint"
   },
