@@ -1,14 +1,17 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useEmail } from "@/lib/emailContext";
 import { 
   PanelLeftClose, 
   PanelLeft, 
   Search, 
   Settings, 
   HelpCircle, 
-  ChevronDown 
+  ChevronDown,
+  LogOut,
+  User,
 } from "lucide-react";
 
 interface PageHeaderProps {
@@ -21,6 +24,17 @@ interface PageHeaderProps {
   onOpenCompose: () => void;
 }
 
+function getInitials(nameOrEmail: string): string {
+  const trimmed = nameOrEmail.trim();
+  if (!trimmed) return "?";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  const local = trimmed.includes("@") ? trimmed.split("@")[0] : trimmed;
+  return local.slice(0, 2).toUpperCase();
+}
+
 export const PageHeader: React.FC<PageHeaderProps> = ({
   sidebarOpen,
   onToggleSidebar,
@@ -29,6 +43,49 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   currentTheme,
   onToggleTheme,
 }) => {
+  const { settings, showToast } = useEmail();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const primaryIdentity =
+    settings.identities.find(i => i.isDefault) ||
+    settings.identities[0] ||
+    null;
+  const primaryAccount = settings.accounts[0] || null;
+  const displayName = primaryIdentity?.name || primaryAccount?.name || "Konto";
+  const displayEmail = primaryIdentity?.email || primaryAccount?.email || "Nicht verbunden";
+  const initials = getInitials(primaryIdentity?.name || primaryIdentity?.email || primaryAccount?.email || "AO");
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  const handleLogout = () => {
+    setMenuOpen(false);
+    try {
+      localStorage.removeItem("email_app_emails");
+      localStorage.removeItem("email_app_labels");
+      localStorage.removeItem("email_app_settings");
+      localStorage.removeItem("email_app_data_version");
+    } catch {}
+    showToast("Abgemeldet");
+    window.location.href = "/";
+  };
+
   return (
     <header className="v-PageHeader">
       {/* Brand & App Switcher */}
@@ -98,11 +155,111 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           <ChevronDown size={14} />
         </button>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
-          <div className="v-Avatar" style={{ backgroundColor: "#0067b9" }}>
-            AO
-          </div>
-          <ChevronDown size={14} style={{ color: "var(--text-muted)" }} />
+        <div style={{ position: "relative" }} ref={menuRef}>
+          <button
+            type="button"
+            className="v-Button v-Button--subtle"
+            onClick={() => setMenuOpen(open => !open)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            title="Konto"
+            style={{ padding: "2px 6px", gap: "4px" }}
+          >
+            <div className="v-Avatar" style={{ backgroundColor: "#0067b9" }}>
+              {initials}
+            </div>
+            <ChevronDown size={14} style={{ color: "var(--text-muted)" }} />
+          </button>
+
+          {menuOpen && (
+            <div
+              role="menu"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                minWidth: "240px",
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-medium)",
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-dropdown)",
+                zIndex: 100,
+                padding: "6px 0",
+              }}
+            >
+              <div style={{ padding: "10px 14px 12px", borderBottom: "1px solid var(--border-subtle)" }}>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-main)" }}>
+                  {displayName}
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
+                  {displayEmail}
+                </div>
+              </div>
+
+              <Link
+                href="/settings#accounts"
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "9px 14px",
+                  fontSize: "13px",
+                  color: "var(--text-main)",
+                  textDecoration: "none",
+                }}
+                className="v-AccountMenu-item"
+              >
+                <User size={15} />
+                <span>Account-Einstellungen</span>
+              </Link>
+
+              <Link
+                href="/settings"
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "9px 14px",
+                  fontSize: "13px",
+                  color: "var(--text-main)",
+                  textDecoration: "none",
+                }}
+                className="v-AccountMenu-item"
+              >
+                <Settings size={15} />
+                <span>Einstellungen</span>
+              </Link>
+
+              <div style={{ height: "1px", background: "var(--border-subtle)", margin: "6px 0" }} />
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleLogout}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "9px 14px",
+                  fontSize: "13px",
+                  color: "var(--label-red-text)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+                className="v-AccountMenu-item"
+              >
+                <LogOut size={15} />
+                <span>Abmelden</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { useEmail } from "@/lib/emailContext";
 import { flattenLabels, getLabelPath } from "@/lib/labelUtils";
@@ -134,6 +134,14 @@ export default function FastmailSettingsPage() {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
+
+  useEffect(() => {
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return;
+    // accounts / security etc. from Account-Menü
+    const timer = window.setTimeout(() => scrollToSection(hash), 50);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   // Build grouped sidebar
   const groups = SIDEBAR_ITEMS.reduce<Record<string, SidebarItem[]>>((acc, item) => {
@@ -570,7 +578,7 @@ export default function FastmailSettingsPage() {
                     </div>
                     <div className="form-field">
                       <label>Provider</label>
-                      <select value={accProvider} onChange={(e) => setAccProvider(e.target.value as any)}>
+                      <select value={accProvider} onChange={(e) => setAccProvider(e.target.value as 'fastmail' | 'gmail' | 'outlook' | 'custom')}>
                         <option value="fastmail">Fastmail (JMAP)</option>
                         <option value="gmail">Gmail / Workspace</option>
                         <option value="outlook">Outlook 365</option>
